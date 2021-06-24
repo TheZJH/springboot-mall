@@ -26,7 +26,8 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public AdminUser getUserDetailById(Integer loginId) {
-        return null;
+
+        return adminUserMapper.selectByPrimaryKey(loginId);
     }
 
     @Override

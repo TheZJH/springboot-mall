@@ -2,6 +2,7 @@ package com.zjh.mall.controller.admin;
 
 import com.zjh.mall.entity.AdminUser;
 import com.zjh.mall.service.AdminUserService;
+import jdk.internal.org.objectweb.asm.tree.analysis.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -58,7 +59,7 @@ public class AdminController {
         }
         String kaptchaCode = session.getAttribute("verifyCode") + "";
         if (StringUtils.isEmpty(kaptchaCode) || !verifyCode.equals(kaptchaCode)) {
-            session.setAttribute("errorMsg", "验证码错误");
+            session.setAttribute("errorMsg", "验证码或用户名密码错误");
             return "admin/login";
         }
         AdminUser adminUser = adminUserService.login(username, password);
@@ -77,20 +78,62 @@ public class AdminController {
     }
 
     @GetMapping("/profile")
-    public String profile() {
+    public String profile(HttpServletRequest request) {
+        //得到之前存在session中的id
+        Integer loginUserId = (int) request.getSession().getAttribute("loginUserId");
+        //根据id查询到id值所对应的用户信息
+        AdminUser userDetailById = adminUserService.getUserDetailById(loginUserId);
+        //保存session中的值
+        //request.setAttribute("path", "profile");
+        request.setAttribute("loginUserName", userDetailById.getLoginUserName());
+        request.setAttribute("nickName", userDetailById.getNickName());
         return "admin/profile";
     }
 
-    @PostMapping("/profile")
+    @PostMapping("/profile/password")
     @ResponseBody
     public String passwordupdate(HttpServletRequest request,
-                                 @RequestParam("orginalPassword") String orginalPassword,
+                                 @RequestParam("oldPassword") String oldPassword,
                                  @RequestParam("newPassword") String newPassword) {
-        if (StringUtils.isEmpty(orginalPassword) || StringUtils.isEmpty(newPassword)) {
+        if (StringUtils.isEmpty(oldPassword) || StringUtils.isEmpty(newPassword)) {
             return "参数不能为空";
         }
         Integer loginUserId = (int) request.getSession().getAttribute("loginUserId");
-        adminUserService.updateUserPassword(loginUserId, orginalPassword, newPassword);
+        if (adminUserService.updateUserPassword(loginUserId, oldPassword, newPassword)) {
+            //修改成功后删除session中的数据
+            request.getSession().removeAttribute("loginUserId");
+            request.getSession().removeAttribute("loginUser");
+            //前端控制跳转
+            return "success";
+        } else {
+            return "修改失败";
+        }
+
+    }
+
+    @RequestMapping(value = "/profile/name", method = RequestMethod.POST)
+    @ResponseBody
+    public String updateName(HttpServletRequest request,
+                             @RequestParam("loginUserName") String oldName,
+                             @RequestParam("nickName") String newName) {
+        if (StringUtils.isEmpty(oldName) || StringUtils.isEmpty(newName)) {
+            return "用户名为空";
+        }
+        Integer userId = (int) request.getSession().getAttribute("loginUserId");
+        //adminuserService方法可以用if进行判断, 因为他返回的是一个boolean类型的值
+        if (adminUserService.updateUserName(userId, oldName, newName)) {
+            //前端控制跳转
+            return "success";
+        } else {
+            return "修改失败";
+        }
+    }
+
+    @RequestMapping(value = "/logout", method = RequestMethod.GET)
+    public String logout(HttpServletRequest request) {
+        request.getSession().removeAttribute("loginUserId");
+        request.getSession().removeAttribute("loginUser");
+        request.getSession().removeAttribute("errorMsg");
         return "admin/login";
     }
 }
